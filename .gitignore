@@ -1,0 +1,9 @@
+# ignore archives
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.csv
+
+# ignore dataset folder and subfolders
+data/
