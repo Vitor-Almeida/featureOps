@@ -4,6 +4,7 @@
 *.tar.gz
 *.rar
 *.csv
+*.env
 
 # ignore dataset folder and subfolders
 data/
