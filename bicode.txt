@@ -1,0 +1,62 @@
+# O bi sempre executa isso aqui antes de começar:
+# dataset = pandas.DataFrame(field1,field2,field3,...,fieldN)
+# dataset = dataset.drop_duplicates()
+
+from pandas import read_csv,DataFrame
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler,MaxAbsScaler,PowerTransformer
+
+############# LOCAL FLOW : ############################################################
+
+graph_type = 'histogram'
+transform_flag = false
+#######################################################################################
+
+############## GLOBAL FLOW : ##########################################################
+possibleGraphs = ['histogram','boxplot','qqplot']
+#######################################################################################
+
+
+
+############## GLOBAL #################################################################
+sns.set(rc={"figure.dpi":300, 'savefig.dpi':300})
+samplesize = read_csv("D:\\Projetos\\competicoes\\featureOps\\data\\dashboards\\biExports\\samplesize.csv")
+samplesize = list(samplesize['samplesize'])[0]
+dataset = dataset.sample(n=int(samplesize))
+featList = list(dataset['variable'].drop_duplicates())[0]
+dataset = dataset[['numfeatures']]
+#######################################################################################
+
+
+#######################################################################################
+
+def graph_transf():
+
+	if transform_flag:
+		return dataset
+
+	transformers = read_csv("D:\\Projetos\\competicoes\\featureOps\\data\\dashboards\\biExports\\transformers.csv")
+	transformers = list(transformers['transformers'])[0]
+	transDic = {'StandardScaler':StandardScaler(),'MaxAbsScaler':MaxAbsScaler(),'PowerTransformer':PowerTransformer()}
+	scaler = transDic[transformers]
+	scaler.fit(dataset)
+	dataset = DataFrame(scaler.transform(dataset),columns={'numfeatures'})
+
+	return dataset
+
+def graph_hist():
+
+	if graph_type != 'histogram':
+		return none
+
+	binsLen = int(round(len(dataset) ** (1/2),0))
+	graph = sns.histplot(data=dataset, x="numfeatures",bins=binsLen,kde=True)
+	graph.set(title=f'{featList} Distribuiton Transformed by {transDic[transformers]}')
+	graph.set_xlabel("Bins")
+	graph.set_ylabel("Frequency")
+	#plt.tight_layout()
+	plt.show()
+
+graph_transf()
+graph_hist()

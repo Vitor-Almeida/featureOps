@@ -8,6 +8,7 @@ from config.envsConfig import ROOT_DIR
 #from dotenv import load_dotenv
 #load_dotenv()
 
+st.set_page_config(layout="wide")
 st.title('Transformations (numeric)')
 FILEPATHDATA = os.path.join(ROOT_DIR, 'data', "tabular-playground-series-may-2022", "train.csv")
 #print(os.environ.get("APIKEY"))
@@ -34,15 +35,33 @@ def readDF(fileDir):
 
 data = readDF(FILEPATHDATA)
 
-variavel = 'f_01' #aparecer alguma coisa antes do usuario selecionar
+#layout
+variavel1 = 'f_01' #aparecer alguma coisa antes do usuario selecionar
+variavel1 = st.select_slider(
+    'Selecionar feature 1',
+    options=list(data.columns),key=1)
 
-variavel = st.select_slider(
-     'Selecionar uma variavel',
-     options=list(data.columns))
+variavel2 = 'f_02' #aparecer alguma coisa antes do usuario selecionar
+variavel2 = st.select_slider(
+    'Selecionar feature 2',
+    options=list(data.columns),key=2)
 
-st.subheader('Histograma da Variavel:')
+col1, col2,col3,col4 = st.columns(4)
+
+with col1:
+
+    st.subheader('Histograma da Variavel:')
+    fig = px.histogram(data.sample(n=2000), x=variavel1)
+    st.plotly_chart(fig,use_container_width=True)
+
+with col2:
+
+    st.subheader('Histograma da Variavel:')
+    fig = px.histogram(data.sample(n=2000), x=variavel2)
+    st.plotly_chart(fig,use_container_width=True)
+
+
 #dataFiltered = data[data['variable']==variavel]
-fig = px.histogram(data, x=variavel)
+
 #ax.hist(x['numFeatures'], bins=int(round(len(x) ** (1/2),0)))
 #st.dataframe(x['numFeatures'].describe())
-st.plotly_chart(fig)
