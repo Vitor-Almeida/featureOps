@@ -10,10 +10,12 @@ class dataFrame:
     def __init__(self,
         filepath = os.path.join(ROOT_DIR,"data","tabular-playground-series-may-2022", "train.csv"), #"manual", se mudar o path tem que mudar quais feat sao cat,num
         sample = 0,
-        dfDic = {'fTabDFNum':{'tableName':'numeric','df':None,'triggerPath':None}
-                ,'fmeltDFNum':{'tableName':'meltednumeric','df':None,'triggerPath':None}
-                ,'dIdDF':{'tableName':'dim_id','df':None,'triggerPath':None}
-                ,'dVarDF':{'tableName':'dim_features','df':None,'triggerPath':None}}, #dataframes básicos
+        dfDic = {'fTabDFNum':{'tableName':'fTabDFNum','df':None,'triggerPath':None}
+                ,'fmeltDFNum':{'tableName':'fmeltDFNum','df':None,'triggerPath':None}
+                ,'fTabDFNum_T':{'tableName':'fTabDFNum_T','df':None,'triggerPath':None}
+                ,'fmeltDFNum_T':{'tableName':'fmeltDFNum_T','df':None,'triggerPath':None}
+                ,'dIdDF':{'tableName':'dIdDF','df':None,'triggerPath':None}
+                ,'dVarDF':{'tableName':'dVarDF','df':None,'triggerPath':None}}, #dataframes que precisam estar inicializados básicos
         idxName = ['id'],
         catFList = ['f_27',"f_07","f_08","f_09","f_10","f_11","f_12"], #fake category
         discFList = ["f_13","f_14","f_15","f_16","f_17","f_18","f_29","f_30"], #essa parte ta manual, meio que o filepath tmb é manual
@@ -32,51 +34,51 @@ class dataFrame:
         self.pandasDf = pd.read_csv(self.filepath)
         self.pandasDf.set_index(self.idxName[0],inplace=True,drop=False)
 
-        self.numFList = list(set(self.pandasDf.columns) - set(self.tgtFList) - set(self.discFList) - set(self.catFList))
+        self.numFList = list(set(self.pandasDf.columns) - set(self.idxName) - set(self.discFList) - set(self.catFList))
+        self.numFList_sT = list(set(self.pandasDf.columns) - set(self.tgtFList) - set(self.idxName) - set(self.discFList) - set(self.catFList))
+        self.numFList_sT.sort()
         self.numFList.sort()
 
-        fmeltDFNum = pd.melt(self.pandasDf, var_name = "variable", id_vars = self.idxName + self.catFList, value_vars=self.numFList+self.discFList,value_name='numFeatures')
+        fmeltDFNum = pd.melt(self.pandasDf, var_name = "variable", id_vars = self.idxName + self.catFList, value_vars=self.numFList+self.discFList,value_name='numFeatures', ignore_index=False)
 
-        dVarDF = pd.DataFrame(list(set(self.pandasDf.columns) - set(self.idxName)),columns=["variable"])
+        dVarDF = pd.DataFrame(list(set(self.pandasDf.columns) - set(self.idxName)),columns=["variable"],index=list(set(self.pandasDf.columns) - set(self.idxName)))
         dVarDF.drop_duplicates(inplace=True)
-        dIdDF = pd.DataFrame(list(self.pandasDf.index),columns=self.idxName)
+        dIdDF = pd.DataFrame(list(self.pandasDf.index),columns=self.idxName,index=self.pandasDf.index)
         dIdDF.drop_duplicates(inplace=True)
 
         if sample != 0 and sample < len(self.pandasDf):
             fmeltDFNum = fmeltDFNum.groupby("variable").sample(n=sample, random_state=111)
             self.pandasDf = self.pandasDf.sample(n=sample, random_state=111)
 
-        fTabDFNum = self.pandasDf[self.numFList]
+        fTabDFNum = self.pandasDf[self.numFList+self.idxName]
 
-        self.pandasDf.drop(columns=['id'],inplace=True)
-        fmeltDFNum.drop(columns=['id'],inplace=True)
-        fTabDFNum.drop(columns=['id'],inplace=True)
+        #self.pandasDf.drop(columns=['id'],inplace=True) #nao da pra tirar pq se nao quando for pro postgres ele nao ler o index, já q index nao é coluna
+        #fmeltDFNum.drop(columns=['id'],inplace=True) #nao da pra tirar pq se nao quando for pro postgres ele nao ler o index, já q index nao é coluna
+        #fTabDFNum.drop(columns=['id'],inplace=True) #nao da pra tirar pq se nao quando for pro postgres ele nao ler o index, já q index nao é coluna
+
+        #arrumar os dtypes? fica mais rapido?
 
         self.dfDic['fTabDFNum']['df'] = fTabDFNum
         self.dfDic['fmeltDFNum']['df'] = fmeltDFNum
         self.dfDic['dVarDF']['df'] = dVarDF
         self.dfDic['dIdDF']['df'] = dIdDF
 
-        ##########################################################
+    def createCorrelDFrame(self,flagTrans): #depois da inicializacao
 
-        #arrumar os dtypes?
-
-    def createCorrelDFrame(self):
-
-        tableName = 'correltable'
-        triggerPath = None
-
-        correl = self.dfDic['fTabDFNum']['df'].corr()
-        #correl = pd.melt(correl, value_vars = self.numFList+self.discFList+tgtFList,value_name='correl', ignore_index=False)
+        if flagTrans:
+            tableName = 'correltable_T'
+            triggerPath = None
+            correl = self.dfDic['fTabDFNum_T']['df'].corr()
+        else:
+            tableName = 'correltable'
+            triggerPath = None
+            correl = self.dfDic['fTabDFNum']['df'].corr()
+        
         correl = pd.melt(correl , value_name='correl', ignore_index=False)
         correl.reset_index(inplace=True)
         correl = correl.rename(columns={'index':'variable','variable':'variable1'})
-
         dicAdd = {'tableName':tableName,'df':correl,'triggerPath':triggerPath}
-
-        self.dfDic[tableName] = dicAdd
-    
-        return None
+        self.dfDic[dicAdd['tableName']] = dicAdd
 
     def showDTale(self):
 
@@ -86,17 +88,33 @@ class dataFrame:
 
         return None
 
-    def transFormData(self):
 
-        #precisa aplicar tanto no tabular quanto no melt
+    def transFormData(self): #antes da inicializacao
+        
+        #tem q ver se vai ficar usando esse negocio de triggerPath
+        triggerPath = os.path.join(ROOT_DIR,"data","dashboards", "biExports","transformers.csv")
 
-        transformers = read_csv("D:\\Projetos\\competicoes\\featureOps\\data\\dashboards\\biExports\\transformers.csv")
-        transformers = list(transformers['transformers'])[0]
+        transformers = readSlicer("transformers.csv")
+
         transDic = {'StandardScaler':StandardScaler(),'MaxAbsScaler':MaxAbsScaler(),'PowerTransformer':PowerTransformer()} #colocar aqui os suportados
         scaler = transDic[transformers]
-        scaler.fit(dataset)
-        dataset = DataFrame(scaler.transform(dataset),columns={'numfeatures'}) #ajustar aqui para o modo tabular
-        
+
+        dataset_T = self.pandasDf
+        scaler.fit(dataset_T[self.numFList_sT])
+        ### talvez seja diferente para cada tipo de transformação, tem q chegar, pode criar uma função aqui trans = f(x)
+        transformation = scaler.transform(dataset_T[self.numFList_sT])
+        dataset_T[self.numFList_sT] = pd.DataFrame(transformation,columns=self.numFList_sT,index=dataset_T[self.numFList_sT].index)
+        ##############
+
+        fTabDFNum_T = dataset_T[self.numFList + self.idxName]
+        fmeltDFNum_T = pd.melt(dataset_T, var_name = "variable", id_vars = self.idxName + self.catFList, value_vars=self.numFList+self.discFList,value_name='numFeatures', ignore_index=False)
+
+        dicAdd = {'tableName':'fTabDFNum_T','df':fTabDFNum_T,'triggerPath':triggerPath}
+        self.dfDic[dicAdd['tableName']] = dicAdd
+
+        dicAdd = {'tableName':'fmeltDFNum_T','df':fmeltDFNum_T,'triggerPath':triggerPath}
+        self.dfDic[dicAdd['tableName']] = dicAdd
+
         return None
 
 def createColumnStr(df,typeMap={"int64":"bigint","object":"varchar(100)","float64":"double precision"}):
@@ -105,6 +123,9 @@ def createColumnStr(df,typeMap={"int64":"bigint","object":"varchar(100)","float6
     dfTypes = df.dtypes
 
     strList = ""
+
+    #### precisa criar os indices
+
 
     for idx in range(0,len(dfcolumns)):
 
@@ -118,6 +139,7 @@ def createColumnStr(df,typeMap={"int64":"bigint","object":"varchar(100)","float6
             strList = strList + " " + str(dfcolumns[idx]) + " " + typeMap[str(dfTypes[idx])] + ","
 
     return strList
+
 
 def copyDataToSQL(df,tablename,path = os.path.join(ROOT_DIR,"data","tmp")):
 
@@ -151,13 +173,48 @@ def copyDataToSQL(df,tablename,path = os.path.join(ROOT_DIR,"data","tmp")):
 
     return None
 
+def readSlicer(filename):
+
+    #csv com exatamente 2 linhas, pode dar problema ser o utf, encoding etc for diferente.
+
+    filePath = os.path.join(ROOT_DIR,"data","dashboards", "biExports",filename)
+    file = open(filePath)
+    lines = file.readlines()
+    selSlice = ''.join(string for string in lines[1] if string.isprintable())
+    file.close()
+
+    return selSlice
+
+def createAuxTables():
+
+    # bem manual
+
+    transList = ['transformers','MaxAbsScaler','MinMaxScaler','Normalizer','PolynomialFeatures','PowerTransformer','QuantileTransformer','RobustScaler','SplineTransformer','StandardScaler']
+    sampleList = []
+
+    for idx in range(1,50000,999):
+        sampleList.append(idx)
+
+    transformers = pd.DataFrame(transList,columns=['transformers'],index=transList)
+    samplesize = pd.DataFrame(sampleList,columns=['samplesize'],index=sampleList)
+
+    copyDataToSQL(df = transformers,tablename = transformers.columns[0])
+    copyDataToSQL(df = samplesize,tablename = samplesize.columns[0])
+
+    return None
+
 def main():
 
-    datasets = dataFrame(sample = 1000)
+    createAuxTables()
+
+    datasets = dataFrame(sample = int(readSlicer("transformers.csv"))) # aqui tem um trigger tmb
     #datasets.showDTale() #abrir o dtale
 
+    datasets.transFormData() ### assume que existe o arquivo .csv do usuario, as tabelas transf sao consideradas de inicializacao
+
     #criar df correl
-    datasets.createCorrelDFrame()
+    datasets.createCorrelDFrame(flagTrans=False)
+    datasets.createCorrelDFrame(flagTrans=True)
 
     ## first create:
     for key in datasets.dfDic:
