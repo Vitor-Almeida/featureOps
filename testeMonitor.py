@@ -3,7 +3,7 @@ import time
 
 _cached_stamp = 0
 filename = ['D:\\Projetos\\competicoes\\featureOps\\data\\dashboards\\biExports\\f1.csv',2,3,4]
-funcoes_sql = ['fx','fy','fz','fo']
+x =funcoes_sql = ['fx','fy','fz','fo']
 
 
 while(1):
