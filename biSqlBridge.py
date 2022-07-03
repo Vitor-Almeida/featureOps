@@ -6,6 +6,8 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler,MaxAbsScaler,PowerTransformer
 import time
 
+### tem q colocar as colunas categoricas na tabela df para conseguir ficar filtrando etc.
+
 
 class dataFrame:
     def __init__(self,
@@ -48,10 +50,10 @@ class dataFrame:
         dIdDF.drop_duplicates(inplace=True)
 
         if sample != 0 and sample < len(self.pandasDf):
-            fmeltDFNum = fmeltDFNum.groupby("variable").sample(n=sample, random_state=111)
+            fmeltDFNum = fmeltDFNum.groupby("variable").sample(n=int(round(sample/10,0)), random_state=111)
             self.pandasDf = self.pandasDf.sample(n=sample, random_state=111)
 
-        fTabDFNum = self.pandasDf[self.numFList+self.idxName]
+        fTabDFNum = self.pandasDf#[self.numFList+self.idxName]
 
         #self.pandasDf.drop(columns=['id'],inplace=True) #nao da pra tirar pq se nao quando for pro postgres ele nao ler o index, já q index nao é coluna
         #fmeltDFNum.drop(columns=['id'],inplace=True) #nao da pra tirar pq se nao quando for pro postgres ele nao ler o index, já q index nao é coluna
@@ -70,11 +72,11 @@ class dataFrame:
         if flagTrans:
             tableName = 'correltable_T'
             triggerPath = ['samplesize.csv','transformers.csv']
-            correl = self.dfDic['fTabDFNum_T']['df'].corr()
+            correl = self.dfDic['fTabDFNum_T']['df'][self.numFList].corr() #correl só com o numerico
         else:
             tableName = 'correltable'
             triggerPath = ['samplesize.csv']
-            correl = self.dfDic['fTabDFNum']['df'].corr()
+            correl = self.dfDic['fTabDFNum']['df'][self.numFList].corr() #correl só com o numerico
         
         correl = pd.melt(correl , value_name='correl', ignore_index=False)
         correl.reset_index(inplace=True)
@@ -82,13 +84,13 @@ class dataFrame:
         dicAdd = {'tableName':tableName,'df':correl,'triggerPath':triggerPath,'_cached_stamp':[0]*len(triggerPath)}
         self.dfDic[dicAdd['tableName']] = dicAdd
 
-    def showDTale(self):
+    #def showDTale(self):
 
-        d = dtale.show(self.fTabDFNum)
-        print(d._url)
-        d.open_browser()
+        #d = dtale.show(self.fTabDFNum)
+        #print(d._url)
+        #d.open_browser()
 
-        return None
+        #return None
 
     def transFormData(self): #antes da inicializacao
         
@@ -154,6 +156,8 @@ def copyDataToSQL(df,tablename,path = os.path.join(ROOT_DIR,"data","tmp")):
 
     strList = createColumnStr(df)
 
+    sqlDrop = '''DROP TABLE IF EXISTS ''' + tablename
+
     sqlCreate = '''CREATE TABLE IF NOT EXISTS ''' + tablename + ''' ''' + strList
 
     sqlCopy = '''COPY ''' + tablename + ''' FROM ''' + "'"+filePath+"'" + ''' DELIMITER ',' CSV; '''
@@ -162,8 +166,11 @@ def copyDataToSQL(df,tablename,path = os.path.join(ROOT_DIR,"data","tmp")):
     cur.execute("CREATE TABLE IF NOT EXISTS _measures (_measures int); TRUNCATE TABLE _measures; INSERT INTO _measures (_measures) VALUES (1);")
     ### tem q criar a tabela de data
 
+    ##USAR SOMENTE QUANDO TIVER DEBUGANDO:
+    cur.execute(sqlDrop)
+    ######################################
     cur.execute(sqlCreate)
-    cur.execute('TRUNCATE TABLE ' + tablename)
+    #cur.execute('TRUNCATE TABLE ' + tablename) #?
     #print(sqlCopy)
     cur.execute(sqlCopy)
     pg_conn.commit()
@@ -191,7 +198,8 @@ def createAuxTables():
 
     # bem manual
 
-    transList = ['transformers','MaxAbsScaler','MinMaxScaler','Normalizer','PolynomialFeatures','PowerTransformer','QuantileTransformer','RobustScaler','SplineTransformer','StandardScaler']
+    transList = ['None','MaxAbsScaler','MinMaxScaler','Normalizer','PolynomialFeatures','PowerTransformer','QuantileTransformer','RobustScaler','SplineTransformer','StandardScaler']
+    writeFinalTransSelector = ['new','append','hold']
     sampleList = [0]
 
     for idx in range(0,50000,1000):
@@ -199,9 +207,11 @@ def createAuxTables():
 
     transformers = pd.DataFrame(transList,columns=['transformers'],index=transList)
     samplesize = pd.DataFrame(sampleList,columns=['samplesize'],index=sampleList)
+    writeFinalTransSelector = pd.DataFrame(writeFinalTransSelector,columns=['writeFeatSelector'],index=writeFinalTransSelector)
 
     copyDataToSQL(df = transformers,tablename = transformers.columns[0])
     copyDataToSQL(df = samplesize,tablename = samplesize.columns[0])
+    copyDataToSQL(df = writeFinalTransSelector,tablename = writeFinalTransSelector.columns[0])
 
     return None
 
@@ -214,7 +224,7 @@ def initTables(sampleSize,dashboardSlicerPath = os.path.join(ROOT_DIR,"data","da
     createAuxTables()
 
     #sempre começar com algum sample pra agilizar as parada
-    datasets = dataFrame(sample = sampleSize) # aqui tem um trigger tmb
+    datasets = dataFrame(sample = sampleSize)
     #datasets.showDTale() #abrir o dtale
 
     datasets.transFormData() ### assume que existe o arquivo .csv do usuario, as tabelas transf sao consideradas de inicializacao
@@ -236,7 +246,7 @@ def initTables(sampleSize,dashboardSlicerPath = os.path.join(ROOT_DIR,"data","da
             for files in dicRecord['triggerPath']:
                 dicRecord['_cached_stamp'].append(os.stat(os.path.join(dashboardSlicerPath,files)).st_mtime)
 
-    print("init das tabelas terminado")
+    print("init das tabelas terminado... ")
 
     return datasets
 
@@ -245,7 +255,8 @@ def main():
     datasets = initTables(sampleSize = int(readSlicer("samplesize.csv")))
 
     dashboardSlicerPath = os.path.join(ROOT_DIR,"data","dashboards", "biExports")
-    
+
+    print('monitorando alterações nos csvs...')    
     while(1): #main loop
         time.sleep(1)
         oneUpdate = []
