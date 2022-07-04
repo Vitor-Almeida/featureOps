@@ -1,23 +1,30 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler,MaxAbsScaler,PowerTransformer
-#dataset = pd.DataFrame([['f_01,f_02,03',2,5],['f_02',3,4],['f_03',6,8]],columns=['multiSelVar','selectedTrans','writefeatselector'])
-dataset = pd.DataFrame([['f_01,f_02,03','stand','new']],columns=['multiSelVar','selectedTrans','writefeatselector'])
+from scipy.stats import kurtosis,skew
+dataset = pd.DataFrame([[1,2,3],[66,3,4],[77,6,8]],columns=['multiSelVar','selectedTrans','writefeatselector'])
+#dataset = pd.DataFrame([['f_01,f_02,03','stand','new']],columns=['multiSelVar','selectedTrans','writefeatselector'])
 
-dfList = []
-multiSelVar = dataset.at[0,'multiSelVar']
-multiSelVar = list(multiSelVar.split(","))
-selectedTrans = [dataset.at[0,'selectedTrans']] * len(multiSelVar)
-writefeatselector = dataset.at[0,'writefeatselector']
+a = [('a','b')]
+b = [('None','None')]
+x = a + b
+print(x)
+
+x = ['1','2']
+print(x)
+x.remove('1')
+print(x)
+
+print(dataset.head(5))
+print(dataset.apply(kurtosis))
+print(dataset.head(5))
 
 
-dfList.append(multiSelVar)
-dfList.append(selectedTrans)
-dfList = np.array(dfList).T
 
-df = pd.DataFrame(dfList,columns = ['variable','transformation'])
-
-df.to_csv('D:\\Projetos\\competicoes\\featureOps\\data\\dashboards\\biExports\\transformationsFullDB.csv',index=False)
+#z =dataset.sum()
+#print(z.head(5))
+#dataset.iloc[: , 0:1] = pd.DataFrame([6,6,6])
+#print(dataset.head(5))
 
 #x = df.at[0,'c']
 #fs = list(x.split(","))

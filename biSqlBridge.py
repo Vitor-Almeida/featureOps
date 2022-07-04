@@ -34,6 +34,7 @@ class dataFrame:
 
         ### making the "basics" dataframe that we use #############
 
+        #arrumar os dtypes? fica mais rapido?
         self.pandasDf = pd.read_csv(self.filepath)
         self.pandasDf.set_index(self.idxName[0],inplace=True,drop=False)
 
@@ -44,10 +45,28 @@ class dataFrame:
 
         fmeltDFNum = pd.melt(self.pandasDf, var_name = "variable", id_vars = self.idxName + self.catFList, value_vars=self.numFList+self.discFList,value_name='numFeatures', ignore_index=False)
 
-        dVarDF = pd.DataFrame(list(set(self.pandasDf.columns) - set(self.idxName)),columns=["variable"],index=list(set(self.pandasDf.columns) - set(self.idxName)))
+        ##colocar isso aqui em uma função################################################
+
+        catArray = []
+        dVarDFList = list(set(self.pandasDf.columns) - set(self.idxName))
+        for n in dVarDFList:
+            if n in catFList:
+                catArray.append('categoryVar')
+            elif n in tgtFList:
+                catArray.append('targetVar')
+            elif n in discFList:
+                catArray.append('discVar')
+            else:
+                catArray.append('numVar')
+
+        dVarDFList=list(zip(dVarDFList,catArray)) + [('None','None')]
+        dVarDF = pd.DataFrame(dVarDFList,columns=["variable","varType"],index=list(set(self.pandasDf.columns+['None']) - set(self.idxName)))
         dVarDF.drop_duplicates(inplace=True)
+
         dIdDF = pd.DataFrame(list(self.pandasDf.index),columns=self.idxName,index=self.pandasDf.index)
         dIdDF.drop_duplicates(inplace=True)
+
+        ###################################################################################
 
         if sample != 0 and sample < len(self.pandasDf):
             fmeltDFNum = fmeltDFNum.groupby("variable").sample(n=int(round(sample/10,0)), random_state=111)
@@ -55,11 +74,7 @@ class dataFrame:
 
         fTabDFNum = self.pandasDf#[self.numFList+self.idxName]
 
-        #self.pandasDf.drop(columns=['id'],inplace=True) #nao da pra tirar pq se nao quando for pro postgres ele nao ler o index, já q index nao é coluna
-        #fmeltDFNum.drop(columns=['id'],inplace=True) #nao da pra tirar pq se nao quando for pro postgres ele nao ler o index, já q index nao é coluna
-        #fTabDFNum.drop(columns=['id'],inplace=True) #nao da pra tirar pq se nao quando for pro postgres ele nao ler o index, já q index nao é coluna
 
-        #arrumar os dtypes? fica mais rapido?
         #responsabilidade de colocar o dic certinho na classe dataframe é de cada funcao que cria a tabela.
 
         self.dfDic['fTabDFNum']['df'] = fTabDFNum
@@ -200,6 +215,7 @@ def createAuxTables():
 
     transList = ['None','MaxAbsScaler','MinMaxScaler','Normalizer','PolynomialFeatures','PowerTransformer','QuantileTransformer','RobustScaler','SplineTransformer','StandardScaler']
     writeFinalTransSelector = ['new','append','hold']
+    possibleGraphsSlicer = ['histogram','qqplot','boxplot','table','heatcorrel','scatter','jointplot']
     sampleList = [0]
 
     for idx in range(0,50000,1000):
@@ -208,10 +224,12 @@ def createAuxTables():
     transformers = pd.DataFrame(transList,columns=['transformers'],index=transList)
     samplesize = pd.DataFrame(sampleList,columns=['samplesize'],index=sampleList)
     writeFinalTransSelector = pd.DataFrame(writeFinalTransSelector,columns=['writeFeatSelector'],index=writeFinalTransSelector)
+    possibleGraphsSlicer = pd.DataFrame(possibleGraphsSlicer,columns=['possibleGraphs'],index=possibleGraphsSlicer)
 
     copyDataToSQL(df = transformers,tablename = transformers.columns[0])
     copyDataToSQL(df = samplesize,tablename = samplesize.columns[0])
     copyDataToSQL(df = writeFinalTransSelector,tablename = writeFinalTransSelector.columns[0])
+    copyDataToSQL(df = possibleGraphsSlicer,tablename = possibleGraphsSlicer.columns[0])
 
     return None
 
